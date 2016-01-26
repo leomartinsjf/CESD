@@ -1,0 +1,134 @@
+---
+title: "CES-D"
+author: "Leonardo Martins"
+date: "17 de janeiro de 2016"
+output: html_document
+---
+
+#Preparing new analysis to CES-D manuscript review
+
+Loading required packages
+```{r}
+require(foreign) # Read data stored SPSS
+require(psych)
+```
+
+```{r}
+#Setting Directory
+setwd("~/CES-D")
+
+#Importing SPSS file .sav
+base.dat <- read.spss("PD10.sav", to.data.frame = T)
+
+#Sum CESD itens in order to find NA
+base.dat$scaleSum <- rowSums(base.dat[,267:286])
+
+#Creating a subset for analysis without NA
+base.CESD <- subset(base.dat, subset=!is.na(base.dat$scaleSum))
+
+#Creating a subset only with CESD
+fullScale  <- base.CESD[ , 267:286]
+```
+
+```{r}
+## KMO
+KMO(fullScale)
+```
+
+```{r}
+# Bartlett Test
+bartlett.test(fullScale)
+```
+
+
+```{r}
+# Parallel Analysis
+faParalel  <- fa.parallel.poly(fullScale, fm="minres", fa="both")
+```
+
+```{r}
+#Polycoric Correlation Matrix
+polyAll <- polychoric(fullScale)
+```
+
+
+#PCA - 2 components unrotated
+
+```{r}
+PCA2u <- principal(polyAll$rho, nfactors = 2)
+print.psych(PCA2u, digits=2, cut= .4)
+plot.psych(PCA2u)
+```
+
+
+
+#PCA - 2 components rotated
+
+```{r}
+PCA2 <- principal(polyAll$rho, nfactors = 2, rotate="oblimin")
+print.psych(PCA2, digits=2, cut= .4)
+plot.psych(PCA2)
+```
+
+
+
+#PCA - 4 components unrotated
+
+```{r}
+PCA4u <- principal(polyAll$rho, nfactors = 4)
+print.psych(PCA4u, digits=2, cut= .4)
+plot.psych(PCA4u)
+```
+
+#PCA - 4 components rotated
+
+```{r}
+PCA4 <- principal(polyAll$rho, nfactors = 4, rotate="oblimin")
+print.psych(PCA4, digits=2, cut= .4)
+plot.psych(PCA4)
+```
+
+
+#FA - 2 factors unrotated
+```{r}
+fa2u <- fa.poly(fullScale, nfactors = 2, fm="minres")
+print.psych(fa2u, digits=2, cut= .4)  
+fa.diagram(fa2u)
+```
+
+#FA - 2 factors
+```{r}
+fa2 <- fa.poly(fullScale, nfactors = 2, rotate = "oblimin", fm="minres")
+print.psych(fa2, digits=2, cut= .4)  
+fa.diagram(fa2)
+```
+
+## FA 4 factors
+```{r}
+fa4u <- fa.poly(fullScale, nfactors = 4, fm="minres")
+print.psych(fa4u, digits=2, cut= .4)
+fa.diagram(fa4u)
+```
+
+## FA 4 factors
+```{r}
+fa4 <- fa.poly(fullScale, nfactors = 4, rotate = "oblimin", fm="minres")
+print.psych(fa4, digits=2, cut= .4)
+fa.diagram(fa4)
+```
+
+
+```{r}
+### Alfa de Cronbach
+#alpha(fullScale)
+#factor? <- fullscale[, c("?")]
+#alpha(factor?, check.keys = TRUE)
+```
+
+
+
+
+
+
+
+

@@ -2,7 +2,15 @@
 title: "CES-D"
 author: "Leonardo Martins"
 date: "17 de janeiro de 2016"
-output: html_document
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 9
+    keep_md: yes
+    toc: yes
 ---
 
 #Preparing new analysis to CES-D manuscript review
@@ -10,12 +18,15 @@ output: html_document
 Loading required packages
 ```{r}
 require(foreign) # Read data stored SPSS
-require(psych)
+require(car) #Recode Variables
+require(psych) #Psychometrics
+require(lavaan) #Confirmatory and SEM
+require(semPlot) # Plots for SEM
 ```
 
 ```{r}
 #Setting Directory
-setwd("~/CES-D")
+setwd("~/CESD")
 
 #Importing SPSS file .sav
 base.dat <- read.spss("PD10.sav", to.data.frame = T)
@@ -28,107 +39,666 @@ base.CESD <- subset(base.dat, subset=!is.na(base.dat$scaleSum))
 
 #Creating a subset only with CESD
 fullScale  <- base.CESD[ , 267:286]
-```
 
-```{r}
-## KMO
-KMO(fullScale)
+#Recoding reversed itens
+fullScale$F4r<- recode(fullScale$F4r, "0=3; 1=2; 2=1; 3=0")
+fullScale$F8r<- recode(fullScale$F8r, "0=3; 1=2; 2=1; 3=0")
+fullScale$F12r<- recode(fullScale$F12r, "0=3; 1=2; 2=1; 3=0")
+fullScale$F16r<- recode(fullScale$F16r, "0=3; 1=2; 2=1; 3=0")
+
+#Aninha needs to check if are these ones the reversed itens
+
+#Creating a Correlation Matrix
+correl <- cor(fullScale)
+
+#Creating a polychoric correlation
+fullScaleT<-polychoric(fullScale)
+
+#Cloning fullScale
+fullScale2 <- fullScale
+
+#Creating a categorical ordered subset for CFA analisys
+orderedScale <-fullScale2[,c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r")] <-
+lapply(fullScale2[,c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r")], ordered)
+orderedScale<-as.data.frame(orderedScale)
 ```
 
 ```{r}
 # Bartlett Test
-bartlett.test(fullScale)
+cortest.bartlett(fullScaleT$rho, n=nrow(fullScale))
 ```
 
+```{r}
+# KMO
+KMO(fullScaleT$rho)
+```
 
 ```{r}
 # Parallel Analysis
-faParalel  <- fa.parallel.poly(fullScale, fm="minres", fa="both")
+fa.parallel(fullScaleT$rho, fm="minres", fa="both", n.obs=513)
 ```
 
 ```{r}
-#Polycoric Correlation Matrix
-polyAll <- polychoric(fullScale)
+#Very Simple Structure
+VSS(fullScaleT$rho, n.obs=513)
 ```
 
-
+#Principal Components Analysis
+```{r}
 #PCA - 2 components unrotated
-
-```{r}
-PCA2u <- principal(polyAll$rho, nfactors = 2)
+PCA2u <- principal(fullScaleT$rho, nfactors = 2)
 print.psych(PCA2u, digits=2, cut= .4)
 plot.psych(PCA2u)
-```
 
-
-
-#PCA - 2 components rotated
-
-```{r}
-PCA2 <- principal(polyAll$rho, nfactors = 2, rotate="oblimin")
+#PCA - 2 components oblique rotated (assuming the components are correlated)
+PCA2 <- principal(fullScaleT$rho, nfactors = 2, rotate="oblimin")
 print.psych(PCA2, digits=2, cut= .4)
 plot.psych(PCA2)
+
+
+### Alfa de Cronbach (FA 2 Components)
+alpha(fullScale, check.keys = TRUE)
+#Pay attention to negative correlated itens in component one
+
+#Component 1
+C1_PCA2 <- fullScale[, c("F1r","F2r","F3r","F5r","F6r","F7r","F9r","F10r","F11r","F13r","F14r","F15r","F17r","F18r","F19r","F20r")]
+alpha(C1_PCA2, check.keys = TRUE)
+
+#Component 2
+C2_PCA2 <- fullScale[, c("F4r","F8r","F12r","F16r")]
+alpha(C2_PCA2, check.keys = TRUE)
 ```
 
-
-
-#PCA - 4 components unrotated
-
+#Fatorial Analysis
 ```{r}
-PCA4u <- principal(polyAll$rho, nfactors = 4)
-print.psych(PCA4u, digits=2, cut= .4)
-plot.psych(PCA4u)
-```
-
-#PCA - 4 components rotated
-
-```{r}
-PCA4 <- principal(polyAll$rho, nfactors = 4, rotate="oblimin")
-print.psych(PCA4, digits=2, cut= .4)
-plot.psych(PCA4)
-```
-
-
-#FA - 2 factors unrotated
-```{r}
-fa2u <- fa.poly(fullScale, nfactors = 2, fm="minres")
-print.psych(fa2u, digits=2, cut= .4)  
-fa.diagram(fa2u)
-```
-
-#FA - 2 factors
-```{r}
-fa2 <- fa.poly(fullScale, nfactors = 2, rotate = "oblimin", fm="minres")
-print.psych(fa2, digits=2, cut= .4)  
-fa.diagram(fa2)
-```
-
-## FA 4 factors
-```{r}
-fa4u <- fa.poly(fullScale, nfactors = 4, fm="minres")
+## FA - 4 factors unrotated
+fa4u <- fa(fullScaleT$rho, nfactors = 4, fm="minres")
 print.psych(fa4u, digits=2, cut= .4)
 fa.diagram(fa4u)
-```
 
-## FA 4 factors
-```{r}
-fa4 <- fa.poly(fullScale, nfactors = 4, rotate = "oblimin", fm="minres")
+## FA - 4 factors oblique rotated (assuming the components are correlated)
+fa4 <- fa(fullScaleT$rho, nfactors = 4, rotate = "oblimin", fm="minres")
 print.psych(fa4, digits=2, cut= .4)
 fa.diagram(fa4)
+
+## FA - 4 factors oblique rotated (assuming the components are correlated) - without three unloaded itens (weight < 0.4)
+fa4r <- fa(fullScaleT$rho[-c(13,14,20),-c(13,14,20) ], nfactors = 4, rotate = "oblimin", fm="minres")
+print.psych(fa4r, digits=2, cut= 0.4)
+fa.diagram(fa4r)
+
+
+#Pay attention to negative correlated itens in component one
+
+#Factor 1
+F1_FA4 <- fullScale[, c("F1r","F2r","F3r","F5r","F6r","F7r","F9r","F10r","F11r")]
+alpha(F1_FA4, check.keys = TRUE)
+
+#Factor 2
+F2_FA4 <-  fullScale[, c("F4r","F8r","F12r","F16r")]
+alpha(F2_FA4, check.keys = TRUE)
+
+#Factor 3
+F3_FA4 <- fullScale[, c("F17r","F18r")]
+alpha(F3_FA4, check.keys = TRUE)
+
+#Factor 4
+F4_FA4 <- fullScale[, c("F15r","F19r")]
+alpha(F4_FA4, check.keys = TRUE)
+```
+
+#Confirmatory Models
+
+```{r}
+#Batistoni CFA Model
+
+#Model Identification
+Batistoni <- '
+              # latent variable definitions 
+               f1 =~ F18r + F14r + F6r + F13r + F19r + F17r + F9r + F10r + F20r
+               f2 =~ F3r + F1r + F7r + F5r + F2r
+               f3 =~F12r + F8r + F16r + F4r
+
+              # variances and covariances 
+               f1 ~~ f2 
+               f2 ~~ f3 
+               f1 ~~ f3
+                        '
+#CFA Fit
+fitBatistoni <- cfa(Batistoni, data = orderedScale,
+           ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitBatistoni, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitBatistoni)
+
+#Parameters Estimates
+EstBatistoni <- parameterEstimates(fitBatistoni, standardized=T, ci=F)
+subset(EstBatistoni, op == "=~")
+
+#Parameters Table
+parTable(fitBatistoni)
+
+#Model Coefficients
+coef(fitBatistoni)
+
+#Modification Index
+MIBatistoni<-modindices(fitBatistoni)
+MIIBatistoni<- MIBatistoni[which(MIBatistoni$mi>30),]
+print(MIIBatistoni)
+
+#Model Plot
+semPaths(fitBatistoni,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
 ```
 
 
 ```{r}
-### Alfa de Cronbach
-#alpha(fullScale)
-#factor? <- fullscale[, c("?")]
-#alpha(factor?, check.keys = TRUE)
+#Silveira CFA Model
+
+#Model Identification
+Silveira <- '
+              # latent variable definitions 
+               f1 =~ F18r + F14r + F6r + F3r + F13r
+               f2 =~ F19r + F15r + F17r + F1r + F9r + F10r
+               f3 =~ F20r + F7r + F5r + F11r
+               f4 =~ F12r + F8r + F16r
+
+             # variances and covariances 
+               f1 ~~ f2 
+               f2 ~~ f3 
+               f3 ~~ f4
+               f1 ~~ f4
+               f1 ~~ f3 
+                       '
+
+#Model Fit
+fitSilveira <- cfa(Silveira, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitSilveira, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitSilveira)
+
+#Parameters Estimates
+EstSilveira <- parameterEstimates(fitSilveira, standardized=T, ci=F)
+subset(EstSilveira, op == "=~")
+
+#Parameters Table
+parTable(fitSilveira)
+
+#Model Coefficients
+coef(fitSilveira)
+
+#Modification Index
+MISilveira<-modindices(fitSilveira)
+MIISilveira<- MISilveira[which(MISilveira$mi>30),]
+print(MIISilveira)
+
+#Model Plot
+semPaths(fitSilveira,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
 ```
 
 
+```{r}
+#Marliere - Principal Components Analysis - Two Components Solution - CFA Model 
+
+PCA2_CFA <- '
+              # latent variable definitions 
+               f1 =~ F4r + F8r + F12r + F16r
+               f2 =~ F1r + F2r + F3r + F5r + F6r + F7r + F9r + F10r + F11r + F13r + F14r + F15r + F17r + F18r + F19r + F20r
+
+                #factor covariances 
+                f1~~f2
+                       '
+fitPCA2 <- cfa(PCA2_CFA, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitPCA2, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitPCA2)
+
+#Parameters Estimates
+EstPCA2 <- parameterEstimates(fitPCA2, standardized=T, ci=F)
+subset(EstPCA2, op == "=~")
+
+#Model Coefficients
+coef(fitPCA2)
+
+#Modification Index
+MIPCA2<-modindices(fitPCA2)
+MIIPCA2<- MIPCA2[which(MIPCA2$mi>30),]
+print(MIIPCA2)
 
 
+#Model Plot
+semPaths(fitPCA2,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
+```
 
+```{r}
+#Marliere - Principal Components Analysis - Two Components Solution Reviewed - CFA Model (removed itens - 4, 8, 13)
+
+PCA2_CFAr <- '
+              # latent variable definitions 
+               f1 =~ F12r + F16r
+               f2 =~ F1r + F2r + F3r + F5r + F6r + F7r + F9r + F10r + F11r + F14r + F15r + F17r + F18r + F19r + F20r
+
+                #factor covariances 
+                f1~~f2
+                       '
+fitPCA2r <- cfa(PCA2_CFAr, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitPCA2r, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitPCA2r)
+
+#Parameters Estimates
+EstPCA2r <- parameterEstimates(fitPCA2r, standardized=T, ci=F)
+subset(EstPCA2r, op == "=~")
+
+#Model Coefficients
+coef(fitPCA2r)
+
+#Modification Index
+MIPCA2r<-modindices(fitPCA2r)
+MIIPCA2r<- MIPCA2r[which(MIPCA2r$mi>30),]
+print(MIIPCA2r)
+
+#Model Plot
+semPaths(fitPCA2r,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
+```
+
+```{r}
+#Marliere - Final Solution - Principal Components Analysis - Two Components Solution Reviewed - CFA Model (removed itens - F4r, F8r, F13r) - and included error covariance
+
+PCA2_CFAr <- '
+              # latent variable definitions 
+               f1 =~ F12r + F16r
+               f2 =~ F1r + F2r + F3r + F5r + F6r + F7r + F9r + F10r + F11r + F14r + F15r + F17r + F18r + F19r + F20r
+
+                #factor covariances 
+                f1~~f2
+
+                #error covariance
+                F15r ~~ F19r
+                F17r ~~ F18r
+                       '
+fitPCA2r <- cfa(PCA2_CFAr, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitPCA2r, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitPCA2r)
+
+#Parameters Estimates
+EstPCA2r <- parameterEstimates(fitPCA2r, standardized=T, ci=F)
+subset(EstPCA2r, op == "=~")
+
+#Model Coefficients
+coef(fitPCA2r)
+
+#Modification Index
+MIPCA2r<-modindices(fitPCA2r)
+MIIPCA2r<- MIPCA2r[which(MIPCA2r$mi>30),]
+print(MIIPCA2r)
+
+#Reability Alpha
+
+#Component 1
+C1_PCA2final <- fullScale[, c("F1r","F2r","F3r","F5r","F6r","F7r","F9r","F10r","F11r","F14r","F15r","F17r","F18r","F19r","F20r")]
+alpha(C1_PCA2final, check.keys = TRUE)
+
+#Component 2
+C2_PCA2final <- fullScale[, c("F12r","F16r")]
+alpha(C2_PCA2final, check.keys = TRUE)
+
+#Model Plot
+semPaths(fitPCA2r,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
+```
+
+
+```{r}
+#Marliere - Factorial Analysis -4 Factos Solution - CFA Model 
+
+FA4_CFA <- '
+              # latent variable definitions 
+              f1 =~ F1r  + F2r  + F3r  + F5r  + F6r  + F7r  + F9r  + F10r  + F11r 
+              f2 =~ F4r  + F8r  + F12r  + F16r 
+              f3 =~ F15r  + F19r
+              f4 =~ F17r + F18r
+
+             # variances and covariances 
+              f1 ~~ f2
+              f1 ~~ f3
+              f1 ~~ f4
+              f2 ~~ f3
+              f2 ~~ f4
+              f3 ~~ f4
+                       '
+fitFA4 <- cfa(FA4_CFA, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitFA4, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitFA4)
+
+#Parameters Estimates
+EstFA4 <- parameterEstimates(fitFA4, standardized=T, ci=F)
+subset(EstFA4, op == "=~")
+
+#Parameters Table
+parTable(fitFA4)
+
+#Model Coefficients
+coef(fitFA4)
+
+#Modification Index
+MIFA4<-modindices(fitFA4)
+MIIFA4<- MIFA4[which(MIFA4$mi>30),]
+print(MIIFA4)
+
+#Model Plot
+semPaths(fitFA4,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
+```
+
+```{r}
+#Marliere - Final Factorial Analysis -4 Factos Solution - CFA Model - Item Removed (F4r e F8r)
+
+FA4_CFA <- '
+              # latent variable definitions 
+              f1 =~ F1r  + F2r  + F3r  + F5r  + F6r  + F7r  + F9r  + F10r  + F11r 
+              f2 =~ F12r + F16r 
+              f3 =~ F15r + F19r
+              f4 =~ F17r + F18r
+
+             # variances and covariances 
+              f1 ~~ f2
+              f1 ~~ f3
+              f1 ~~ f4
+              f2 ~~ f3
+              f2 ~~ f4
+              f3 ~~ f4
+                       '
+fitFA4 <- cfa(FA4_CFA, data = orderedScale,
+        ordered=c("F1r",
+        "F2r",
+        "F3r",
+        "F4r",
+        "F5r",
+        "F6r",
+        "F7r",
+        "F8r",
+        "F9r",
+        "F10r",
+        "F11r",
+        "F12r",
+        "F13r",
+        "F14r",
+        "F15r",
+        "F16r",
+        "F17r",
+        "F18r",
+        "F19r",
+        "F20r"))
+
+#Model Summary 
+summary(fitFA4, standardized=T, fit.measures=T, rsquare=T)
+
+#Model Fit Measures
+fitMeasures(fitFA4)
+
+#Parameters Estimates
+EstFA4 <- parameterEstimates(fitFA4, standardized=T, ci=F)
+subset(EstFA4, op == "=~")
+
+#Parameters Table
+parTable(fitFA4)
+
+#Model Coefficients
+coef(fitFA4)
+
+#Modification Index
+MIFA4<-modindices(fitFA4)
+MIIFA4<- MIFA4[which(MIFA4$mi>30),]
+print(MIIFA4)
+
+#Model Plot
+semPaths(fitFA4,"std", edge.label.cex = 0.5, exoVar = T, exoCov = T, layout = "tree2", optimizeLatRes=F, style = "lisrel", curve= 0.9, sizeLat = 5, sizeLat2 = 5, sizeMan = 2, sizeMan2 = 2, title = F, ThreshAtSide=F)
+
+#Factor 1
+F1_FA4 <- fullScale[, c("F1r","F2r","F3r","F5r","F6r","F7r","F9r","F10r","F11r")]
+alpha(F1_FA4, check.keys = TRUE)
+
+#Factor 2
+F2_FA4 <-  fullScale[, c("F12r","F16r")]
+alpha(F2_FA4, check.keys = TRUE)
+
+#Factor 3
+F4_FA3 <- fullScale[, c("F15r","F19r")]
+alpha(F4_FA3, check.keys = TRUE)
+
+
+#Factor 4
+F3_FA4 <- fullScale[, c("F17r","F18r")]
+alpha(F3_FA4, check.keys = TRUE)
+```
+
+
+#Final Solutions
+```{r}
+#PCA2
+#Sum CESD itens PCA2
+
+#Component 1
+base.dat$PCA2C1 <- base.dat$F1r+ base.dat$F2r+ base.dat$F3r+ base.dat$F5r+ base.dat$F6r+ base.dat$F7r+ base.dat$F9r+ base.dat$F10r+ base.dat$F11r+ base.dat$F14r+ base.dat$F15r+ base.dat$F17r+ base.dat$F18r+ base.dat$F19r+ base.dat$F20r
+
+#Component 1
+base.dat$PCA2C2 <- base.dat$F12r+ base.dat$F16r
+
+
+#FA4
+#Sum CESD itens FA4
+
+#Factor 1
+base.dat$FA4F1 <- base.dat$F1r  + base.dat$F2r  + base.dat$F3r  + base.dat$F5r  + base.dat$F6r  + base.dat$F7r  + base.dat$F9r  + base.dat$F10r  + base.dat$F11r
+
+#Factor 2
+base.dat$FA4F2 <- base.dat$F12r  + base.dat$F16r 
+
+#Factor 3
+base.dat$FA4F3 <- base.dat$F15r  + base.dat$F19r
+
+#Factor 4
+base.dat$FA4F4 <- base.dat$F17r + base.dat$F18r
+```
+
+```{r}
+
+#Correlation - ISMI and CES-D
+
+MatrixcorrPCA2<- base.dat[,c(230:236,288:289)]
+
+corr.test(MatrixcorrPCA2)
+
+MatrixcorrFA4<- base.dat[,c(230:236,290:293)]
+
+corr.test(MatrixcorrFA4)
+```
+
+```{r}
+#Summaries for PCA2
+summary(base.dat$PCA2C1)
+summary(base.dat$PCA2C2)
+
+#Summaries for FA4
+summary(base.dat$FA4F1)
+summary(base.dat$FA4F2)
+summary(base.dat$FA4F3)
+summary(base.dat$FA4F4)
+```
 
 
 
